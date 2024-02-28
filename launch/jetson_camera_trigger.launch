@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 
 <launch>
-  <arg name="frame_rate" default="5" />
-  <arg name="phase" default="0" />
   <arg name="gpio" default="51" />
-
-    <node pkg="jetson_camera_trigger" type="jetson_camera_trigger" name="jetson_camera_trigger" launch-prefix="taskset -c 0">
-         <param name="gpio" value="$(arg gpio)"/>
-         <param name="phase" value="$(arg phase)"/>
-         <param name="frame_rate" value="$(arg frame_rate)"/>
+  <arg name="phase" default="0" />
+  <arg name="frame_rate" default="5" />
+    <node pkg="jetson_camera_trigger" type="jetson_camera_trigger" name="jetson_camera_trigger_$(arg gpio)" launch-prefix="taskset -c 0">
+      <param name="gpio" type="int" value="$(arg gpio)"/>
+      <param name="phase" type="int" value="$(arg phase)"/>
+      <param name="frame_rate" type="int" value="$(arg frame_rate)"/>
+    </node>
 </launch>

@@ -35,7 +35,7 @@ JetsonCameraTriggerNode::JetsonCameraTriggerNode()
     use_triggering_ = true;
     InitializeTrigger();
   }
-  trigger_time_publisher_ = private_nh_.advertise<std_msgs::Time>("trigger_time", 1000);
+  trigger_time_publisher_ = nh_.advertise<std_msgs::Time>("trigger_time", 1000);
 }
 
 void JetsonCameraTriggerNode::InitializeTrigger()
