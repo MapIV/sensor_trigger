@@ -6,7 +6,7 @@
   <arg name="frame_rate" default="5" />
     <node pkg="jetson_camera_trigger" type="jetson_camera_trigger" name="jetson_camera_trigger_$(arg gpio)" launch-prefix="taskset -c 0">
       <param name="gpio" type="int" value="$(arg gpio)"/>
-      <param name="phase" type="int" value="$(arg phase)"/>
+      <param name="phase" type="double" value="$(arg phase)"/>
       <param name="frame_rate" type="int" value="$(arg frame_rate)"/>
     </node>
 </launch>
