@@ -12,97 +12,44 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <sensor_trigger/jetson_gpio.hpp>
 #include <sensor_trigger/sensor_trigger.hpp>
-#include <ament_index_cpp/get_package_share_directory.hpp>
 
-namespace sensor_trigger
+SensorTrigger::SensorTrigger()
 {
-SensorTrigger::SensorTrigger(const rclcpp::NodeOptions & node_options)
-: Node("sensor_trigger", node_options)
-{
-  // Get the triggering parameters
-  fps_ = declare_parameter("frame_rate", 10.0);
-  phase_ = declare_parameter("phase", 0.0);
-  gpio_name_ = declare_parameter("gpio_name", "roscube_trigger1");
-  cpu_ = declare_parameter("cpu_core_id", 1);
-  pulse_width_ms_ = declare_parameter("pulse_width_ms", 5);
-  std::string gpio_mapping_file =
-    declare_parameter("gpio_mapping_file", ament_index_cpp::get_package_share_directory("sensor_trigger") + "/config/gpio_mapping.yaml");
+  std::string gpio_mapping_file;
+  private_nh_.getParam("frame_rate", fps_);
+  private_nh_.getParam("phase", phase_);
+  private_nh_.getParam("gpio_name", gpio_name_);
+  private_nh_.getParam("pulse_width_ms", pulse_width_ms_);
+  private_nh_.getParam("gpio_mapping_file", gpio_mapping_file);
 
   gpio_mapping_ = YAML::LoadFile(gpio_mapping_file);
 
   if (!get_gpio_chip_and_line()) {
-    RCLCPP_ERROR_STREAM(
-      get_logger(),
-      "No valid trigger GPIO specified. Not using triggering on GPIO name " << gpio_name_ << ".");
-    rclcpp::shutdown();
-    return;
+    ROS_ERROR_STREAM("No valid trigger GPIO specified. Not using triggering on GPIO name " << gpio_name_ << ".");
+    exit(1);
   }
 
   if (!gpio_handler_.init_gpio_pin(gpio_chip_, gpio_line_, GPIO_OUTPUT)) {
-    RCLCPP_ERROR_STREAM(
-      get_logger(), "Failed to initialize GPIO trigger. Not using triggering on GPIO chip number "
+    ROS_ERROR_STREAM("Failed to initialize GPIO trigger. Not using triggering on GPIO chip number "
                       << gpio_chip_ << "line number " << gpio_line_ << ".");
-    rclcpp::shutdown();
-    return;
+    exit(1);
   }
 
   if (fps_ < 1.0) {
-    RCLCPP_ERROR_STREAM(
-      get_logger(), "Unable to trigger slower than 1 fps. Not using triggering on GPIO chip number "
+    ROS_ERROR_STREAM("Unable to trigger slower than 1 fps. Not using triggering on GPIO chip number "
                       << gpio_chip_ << "line number " << gpio_line_ << ".");
-    rclcpp::shutdown();
-    return;
+    exit(1);
   }
 
-  if (cpu_ < 0 || cpu_ >= static_cast<int>(std::thread::hardware_concurrency())) {
-    RCLCPP_WARN_STREAM(
-      get_logger(),
-      "Selected CPU core"
-        << cpu_
-        << " is not available on this architecture. Not using triggering on GPIO chip number "
-        << gpio_chip_ << "line number " << gpio_line_ << ".");
-  }
-
-  // Set CPU affinity
-  cpu_set_t cpuset;
-  CPU_ZERO(&cpuset);
-  CPU_SET(cpu_, &cpuset);
-  if (pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset)) {
-    RCLCPP_WARN_STREAM(get_logger(), "Failed to set CPU affinity: " << strerror(errno) << ".");
-  }
-  if (pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset)) {
-    RCLCPP_WARN_STREAM(get_logger(), "Failed to check CPU affinity: " << strerror(errno) << ".");
-  }
-
-  // Create thread
-  trigger_time_publisher_ = create_publisher<builtin_interfaces::msg::Time>("trigger_time", 1000);
-  trigger_thread_ = std::make_unique<std::thread>(&SensorTrigger::run, this);
-
-  // Set thread priority
-  sched_param sch;
-  int policy;
-  pthread_getschedparam(trigger_thread_->native_handle(), &policy, &sch);
-  sch.sched_priority = 30;
-  if (pthread_setschedparam(trigger_thread_->native_handle(), SCHED_FIFO, &sch)) {
-    RCLCPP_WARN_STREAM(
-      get_logger(), "Failed to set schedule parameters: " << strerror(errno) << ".");
-  }
+  trigger_time_publisher_ = nh_.advertise<std_msgs::Time>("trigger_time", 1000);
 }
 
-SensorTrigger::~SensorTrigger()
-{
-  if (trigger_thread_) {
-    if (trigger_thread_->joinable()) {
-      trigger_thread_->join();
-    }
-  }
-}
+SensorTrigger::~SensorTrigger(){}
 
 void SensorTrigger::run()
 {
-  builtin_interfaces::msg::Time trigger_time_msg;
+  std_msgs::Time trigger_time_msg;
 
   // Start on the first time after TOS
   int64_t start_nsec;
@@ -121,11 +68,11 @@ void SensorTrigger::run()
   target_nsec = start_nsec;
   end_nsec = start_nsec - interval_nsec + 1e9;
 
-  while (rclcpp::ok()) {
+  while (ros::ok()) {
     // Do triggering stuff
     // Check current time - assume ROS uses best clock source
     do {
-      now_nsec = rclcpp::Clock{RCL_SYSTEM_TIME}.now().nanoseconds() % (uint64_t)1e9;
+      now_nsec = ros::Time::now().nsec;
       if (now_nsec < end_nsec) {
         while (now_nsec > target_nsec) {
           target_nsec = target_nsec + interval_nsec;
@@ -139,39 +86,37 @@ void SensorTrigger::run()
       // Keep waiting for half the remaining time until the last millisecond.
       // This is required as sleep_for tends to oversleep significantly
       if (wait_nsec > 1e7) {
-        rclcpp::sleep_for(std::chrono::nanoseconds(wait_nsec / 2));
+        ros::Duration(0, wait_nsec/2).sleep();
       }
     } while (wait_nsec > 1e7);
     // std::lock_guard<std::mutex> guard(iomutex_);
     // Block the last millisecond
-    now_nsec = rclcpp::Clock{RCL_SYSTEM_TIME}.now().nanoseconds() % (uint64_t)1e9;
+    now_nsec = ros::Time::now().nsec;
     if (start_nsec == end_nsec) {
       while (now_nsec > 1e7) {
-        now_nsec = rclcpp::Clock{RCL_SYSTEM_TIME}.now().nanoseconds() % (uint64_t)1e9;
+        now_nsec = ros::Time::now().nsec;
       }
     } else if (now_nsec < end_nsec) {
       while (now_nsec < target_nsec) {
-        now_nsec = rclcpp::Clock{RCL_SYSTEM_TIME}.now().nanoseconds() % (uint64_t)1e9;
+        now_nsec = ros::Time::now().nsec;
       }
     } else {
       while (now_nsec > end_nsec || now_nsec < start_nsec) {
-        now_nsec = rclcpp::Clock{RCL_SYSTEM_TIME}.now().nanoseconds() % (uint64_t)1e9;
+        now_nsec = ros::Time::now().nsec;
       }
     }
     // Trigger!
     bool to_high = gpio_handler_.set_gpio_pin_state(GPIO_HIGH);
-    rclcpp::sleep_for(std::chrono::nanoseconds(pulse_width));
-    rclcpp::Time now = rclcpp::Clock{RCL_SYSTEM_TIME}.now();
-    int64_t now_sec = (now.nanoseconds() - pulse_width) / 1e9; // subtract pulse width to correct timestamp
-    trigger_time_msg.sec = (int32_t)now_sec;
-    trigger_time_msg.nanosec = (uint32_t)now_nsec;
-    trigger_time_publisher_->publish(trigger_time_msg);
+    ros::Duration(0, pulse_width).sleep();
+    int64_t now_sec = (ros::Time::now().nsec - pulse_width) / 1e9; // subtract pulse width to correct timestamp
+    trigger_time_msg.data.sec = (int32_t)now_sec;
+    trigger_time_msg.data.nsec = (uint32_t)now_nsec;
+    trigger_time_publisher_.publish(trigger_time_msg);
     bool to_low = gpio_handler_.set_gpio_pin_state(GPIO_LOW);
     target_nsec = target_nsec + interval_nsec >= 1e9 ? start_nsec : target_nsec + interval_nsec;
     if (!(to_high && to_low)) {
-      RCLCPP_ERROR_STREAM(get_logger(), "Failed to set GPIO status: " << strerror(errno));
-      rclcpp::shutdown();
-      return;
+      ROS_ERROR_STREAM("Failed to set GPIO status: " << strerror(errno));
+      exit(1);
     }
   }
 }
@@ -187,7 +132,3 @@ bool SensorTrigger::get_gpio_chip_and_line()
   }
   return false;
 }
-}  // namespace sensor_trigger
-
-#include "rclcpp_components/register_node_macro.hpp"
-RCLCPP_COMPONENTS_REGISTER_NODE(sensor_trigger::SensorTrigger)

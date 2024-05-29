@@ -15,10 +15,11 @@
 #ifndef SENSOR_TRIGGER__SENSOR_TRIGGER_HPP_
 #define SENSOR_TRIGGER__SENSOR_TRIGGER_HPP_
 
-#include <builtin_interfaces/msg/time.hpp>
-#include <rclcpp/rclcpp.hpp>
+#include <sensor_trigger/jetson_gpio.hpp>
 
-#include <pthread.h>
+#include <ros/ros.h>
+#include <std_msgs/Time.h>
+
 #include <yaml-cpp/yaml.h>
 
 #include <memory>
@@ -26,18 +27,18 @@
 #include <string>
 #include <vector>
 
-namespace sensor_trigger
-{
-class SensorTrigger : public rclcpp::Node
+class SensorTrigger
 {
 public:
-  explicit SensorTrigger(const rclcpp::NodeOptions & node_options);
+  explicit SensorTrigger();
   ~SensorTrigger();
 
+  void run();
+
 private:
-  // ros::NodeHandle nh_{ "" };
-  // ros::NodeHandle private_nh_{ "~" };
-  rclcpp::Publisher<builtin_interfaces::msg::Time>::SharedPtr trigger_time_publisher_;
+  ros::NodeHandle nh_{ "" };
+  ros::NodeHandle private_nh_{ "~" };
+  ros::Publisher trigger_time_publisher_;
 
   // Map from gpio name to chip number and line number
   YAML::Node gpio_mapping_;
@@ -49,16 +50,9 @@ private:
   std::string gpio_name_;
   unsigned int gpio_chip_;
   unsigned int gpio_line_;
-  int cpu_;
   std::mutex iomutex_;
-  int64_t pulse_width_ms_;
+  int pulse_width_ms_;
   jetson_gpio::JetsonGpio gpio_handler_;
-
-  // Trigger thread
-  std::unique_ptr<std::thread> trigger_thread_;
-
-  void run();
 };
-}  // namespace sensor_trigger
 
 #endif  // SENSOR_TRIGGER__SENSOR_TRIGGER_HPP_
