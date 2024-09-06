@@ -8,10 +8,10 @@
   <arg name="gpio_mapping_file" default="$(find sensor_trigger)/config/gpio_mapping.yaml"/>
 
   <node pkg="sensor_trigger" type="sensor_trigger" name="sensor_trigger" launch-prefix="taskset -c 0">
-    <param name="gpio_name" value="$(var gpio_name)"/>
-    <param name="phase" value="$(var phase)"/>
-    <param name="frame_rate" value="$(var frame_rate)"/>
-    <param name="pulse_width_ms" value="$(var pulse_width_ms)"/>
-    <param name="gpio_mapping_file" value="$(var gpio_mapping_file)"/>
+    <param name="gpio_name" value="$(arg gpio_name)"/>
+    <param name="phase" value="$(arg phase)"/>
+    <param name="frame_rate" value="$(arg frame_rate)"/>
+    <param name="pulse_width_ms" value="$(arg pulse_width_ms)"/>
+    <param name="gpio_mapping_file" value="$(arg gpio_mapping_file)"/>
   </node>
 </launch>
