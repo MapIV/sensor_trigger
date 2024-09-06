@@ -108,7 +108,7 @@ void SensorTrigger::run()
     // Trigger!
     bool to_high = gpio_handler_.set_gpio_pin_state(GPIO_HIGH);
     ros::Duration(0, pulse_width).sleep();
-    int64_t now_sec = (ros::Time::now().nsec - pulse_width) / 1e9; // subtract pulse width to correct timestamp
+    int64_t now_sec = ros::Time::now().sec - (pulse_width / 1e9); // subtract pulse width to correct timestamp
     trigger_time_msg.data.sec = (int32_t)now_sec;
     trigger_time_msg.data.nsec = (uint32_t)now_nsec;
     trigger_time_publisher_.publish(trigger_time_msg);
