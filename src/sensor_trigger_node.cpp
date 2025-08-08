@@ -22,6 +22,5 @@ int main(int argc, char** argv)
 {
   ros::init(argc, argv, "sensor_trigger");
   SensorTrigger sensor_trigger;
-  sensor_trigger.run();
   return 0;
 }

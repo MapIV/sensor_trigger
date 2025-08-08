@@ -43,9 +43,26 @@ SensorTrigger::SensorTrigger()
   }
 
   trigger_time_publisher_ = nh_.advertise<std_msgs::Time>("trigger_time", 1000);
+  trigger_thread_ = std::make_unique<std::thread>(&SensorTrigger::run, this);
+
+  // Set thread priority
+  sched_param sch;
+  int policy;
+  pthread_getschedparam(trigger_thread_->native_handle(), &policy, &sch);
+  sch.sched_priority = 30;
+  if (pthread_setschedparam(trigger_thread_->native_handle(), SCHED_FIFO, &sch)) {
+    ROS_ERROR_STREAM( "Failed to set schedule parameters: " << strerror(errno) << ".");
+  }
 }
 
-SensorTrigger::~SensorTrigger(){}
+SensorTrigger::~SensorTrigger()
+{
+  if (trigger_thread_) {
+    if (trigger_thread_->joinable()) {
+      trigger_thread_->join();
+    }
+  }
+}
 
 void SensorTrigger::run()
 {

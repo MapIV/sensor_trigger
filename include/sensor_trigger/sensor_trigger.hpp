@@ -33,7 +33,6 @@ public:
   explicit SensorTrigger();
   ~SensorTrigger();
 
-  void run();
 
 private:
   ros::NodeHandle nh_{ "" };
@@ -53,6 +52,10 @@ private:
   std::mutex iomutex_;
   int pulse_width_ms_;
   jetson_gpio::JetsonGpio gpio_handler_;
+
+  void run();
+  std::unique_ptr<std::thread> trigger_thread_;
+  
 };
 
 #endif  // SENSOR_TRIGGER__SENSOR_TRIGGER_HPP_
