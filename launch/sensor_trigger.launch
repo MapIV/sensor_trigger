@@ -6,6 +6,7 @@
   <arg name="frame_rate" default="10.0"/>
   <arg name="pulse_width_ms" default="5"/>
   <arg name="gpio_mapping_file" default="$(find sensor_trigger)/config/gpio_mapping.yaml"/>
+  <arg name="cpu_core_id" default="0">
 
   <node pkg="sensor_trigger" type="sensor_trigger" name="sensor_trigger">
     <param name="gpio_name" value="$(arg gpio_name)"/>
@@ -13,5 +14,6 @@
     <param name="frame_rate" value="$(arg frame_rate)"/>
     <param name="pulse_width_ms" value="$(arg pulse_width_ms)"/>
     <param name="gpio_mapping_file" value="$(arg gpio_mapping_file)"/>
+    <param name="cpu_core_id" value="$(arg cpu_core_id)"/>
   </node>
 </launch>

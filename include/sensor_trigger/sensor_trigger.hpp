@@ -27,6 +27,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <sched.h>
 
 class SensorTrigger
 {
@@ -53,6 +54,7 @@ private:
   std::mutex iomutex_;
   int pulse_width_ms_;
   jetson_gpio::JetsonGpio gpio_handler_;
+  int cpu_;
 
   void run();
   std::unique_ptr<std::thread> trigger_thread_;

@@ -22,6 +22,7 @@ SensorTrigger::SensorTrigger()
   private_nh_.getParam("gpio_name", gpio_name_);
   private_nh_.getParam("pulse_width_ms", pulse_width_ms_);
   private_nh_.getParam("gpio_mapping_file", gpio_mapping_file);
+  private_nh_.getParam("cpu_core_id", cpu_);
 
   gpio_mapping_ = YAML::LoadFile(gpio_mapping_file);
 
@@ -40,6 +41,17 @@ SensorTrigger::SensorTrigger()
     ROS_ERROR_STREAM("Unable to trigger slower than 1 fps. Not using triggering on GPIO chip number "
                       << gpio_chip_ << "line number " << gpio_line_ << ".");
     exit(1);
+  }
+
+  // Set CPU affinity
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  CPU_SET(cpu_, &cpuset);
+  if (pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset)) {
+    ROS_ERROR_STREAM("Failed to set CPU affinity: " << strerror(errno) << ".");
+  }
+  if (pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset)) {
+    ROS_ERROR_STREAM("Failed to check CPU affinity: " << strerror(errno) << ".");
   }
 
   trigger_time_publisher_ = nh_.advertise<std_msgs::Time>("trigger_time", 1000);
